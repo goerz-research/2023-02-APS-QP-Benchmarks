@@ -1,0 +1,7 @@
+
+[pip.deps]
+qdyn = "==22.7"
+[deps]
+ipython = ""
+click = ""
+numpy = ""
