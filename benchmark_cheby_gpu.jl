@@ -41,7 +41,6 @@ include("includes/qdyn.jl")
 function ham_to_gpu(H)
     QuantumControl.Generators.Generator(
         [CuArray(op) for op in H.ops],
-        #[CuArray(ampl) for ampl in H.amplitudes]
         H.amplitudes
     )
 end
@@ -49,7 +48,6 @@ end
 function ham_from_gpu(H)
     QuantumControl.Generators.Generator(
         [Array(op) for op in H.ops],
-        #[Array(ampl) for ampl in H.amplitudes]
         H.amplitudes
     )
 end
@@ -86,120 +84,67 @@ norm(Ψ₀_dense - Array(Ψ₀))
 @assert ishermitian(H.ops[1])
 @assert ishermitian(H.ops[2])
 
-import QuantumControl: init_prop
+# +
+import QuantumPropagators.SpectralRange: specrange
 
-# + active=""
-# import QuantumControl.Controls: get_controls, discretize, discretize_on_midpoints
-
-# + active=""
-# get_controls(ampl::AbstractArray) = (ampl,)
-
-# + active=""
-# function discretize(control::CuArray, tlist)
-#     if length(control) == length(tlist)
-#         return control
-#     elseif length(control) == length(tlist) - 1
-#         # convert `control` on intervals to values on `tlist`
-#         # cf. pulse_onto_tlist in Python krotov package
-#         vals = CuArray(zeros(eltype(control), length(control) + 1))
-#         vals[1] = control[1]
-#         vals[end] = control[end]
-#         for i = 2:length(vals)-1
-#             vals[i] = 0.5 * (control[i-1] + control[i])
-#         end
-#         return vals
-#     else
-#         throw(ArgumentError("control array must be defined on intervals of tlist"))
-#     end
-# end
-#
-# function discretize_on_midpoints(control::CuArray, tlist)
-#     if length(control) == length(tlist) - 1
-#         return control
-#     elseif length(control) == length(tlist)
-#         vals = CuArray(zeros(eltype(control), length(control) - 1))
-#         vals[1] = control[1]
-#         vals[end] = control[end]
-#         for i = 2:length(vals)-1
-#             vals[i] = 2 * control[i] - vals[i-1]
-#         end
-#         return vals
-#     else
-#         throw(ArgumentError("control array must be defined on the points of tlist"))
-#     end
-# end
+specrange(H, method::Val{:manual}) = (-1.0, 1.0)
 # -
 
-function init_prop(state::ST, H::GT, tlist, method::Val{:cheby}; kwargs...) where {ST<:CuArray,GT}
-    propagator = init_prop(psi_from_gpu(state), ham_from_gpu(H), tlist, method; kwargs...)
-    gpu_genop = QuantumControl.Controls.evaluate(H, tlist, 1)
-    OT = typeof(gpu_genop)
-    wrk = QuantumControl.QuantumPropagators.Cheby.ChebyWrk(
-        state, propagator.wrk.Δ, propagator.wrk.E_min, propagator.wrk.dt;
-        limit=propagator.wrk.limit  
-    )
-    return QuantumControl.QuantumPropagators.ChebyPropagator{GT,OT,ST}(
-        H,
-        state,
-        propagator.t,
-        propagator.n,
-        tlist,
-        propagator.parameters,
-        propagator.controls,
-        propagator.control_ranges,
-        gpu_genop,
-        wrk,
-        propagator.backward,
-        propagator.inplace,
-        propagator.specrange_method,
-        propagator.specrange_buffer,
-        propagator.check_normalization,
-        propagator.specrange_options,
-    )
-end
+dense_propagator = init_prop(Ψ₀_dense, H_dense, tlist; method=:cheby, specrange_method=:manual); # DEBUG
 
-dense_propagator = init_prop(Ψ₀_dense, H_dense, tlist, Val(:cheby)); # DEBUG
+propagator = init_prop(Ψ₀, H, tlist; method=:cheby, specrange_method=:manual);
 
-propagator = init_prop(Ψ₀, H, tlist, Val(:cheby));
+# + active=""
+# X = QuantumControl.QuantumPropagators._pwc_set_genop!(dense_propagator, 1)
 
-X = QuantumControl.QuantumPropagators._pwc_set_genop!(dense_propagator, 1)
+# + active=""
+# Y = op_from_gpu(QuantumControl.QuantumPropagators._pwc_set_genop!(propagator, 1))
 
-Y = op_from_gpu(QuantumControl.QuantumPropagators._pwc_set_genop!(propagator, 1))
+# + active=""
+# norm(X.ops[1] - Y.ops[1]), norm(X.ops[2] - Y.ops[2]), norm(X.coeffs .- Y.coeffs) 
 
-norm(X.ops[1] - Y.ops[1]), norm(X.ops[2] - Y.ops[2]), norm(X.coeffs .- Y.coeffs) 
+# + active=""
+# copyto!(propagator.wrk.v0, Ψ₀)
+# Ψ = psi_from_gpu(propagator.wrk.v0);
 
-copyto!(propagator.wrk.v0, Ψ₀)
-Ψ = psi_from_gpu(propagator.wrk.v0);
+# + active=""
+# norm(Array(Ψ₀) - Ψ₀_dense)
 
-norm(Array(Ψ₀) - Ψ₀_dense)
+# + active=""
+# norm(Ψ - Ψ₀_dense)
 
-norm(Ψ - Ψ₀_dense)
+# + active=""
+# Φ = copyto!(dense_propagator.wrk.v0, Ψ₀_dense);
 
-Φ = copyto!(dense_propagator.wrk.v0, Ψ₀_dense);
+# + active=""
+# norm(Φ - Ψ₀_dense)
 
-norm(Φ - Ψ₀_dense)
+# + active=""
+# x = prop_step!(dense_propagator);
 
-x = prop_step!(dense_propagator);
+# + active=""
+# y = prop_step!(propagator);
 
-y = prop_step!(propagator);
+# + active=""
+# norm(Ψ₀_dense - Array(Ψ₀))
 
-norm(Ψ₀_dense - Array(Ψ₀))
-
-norm(x - Array(y))
+# + active=""
+# norm(x - Array(y))
+# -
 
 typeof(propagator)
 
 # + active=""
-# @benchmark init_prop($Ψ₀, $H, $tlist)
+# @benchmark init_prop($Ψ₀, $H, $tlist; method=:cheby, specrange_method=:manual)
 
 # + active=""
-# propagator = init_prop(Ψ₀, H, tlist; cheby_coeffs_limit)
+# propagator = init_prop(Ψ₀, H, tlist; method=:cheby, specrange_method=:manual, cheby_coeffs_limit)
 # @benchmark prop_step!(propagator) evals=1 samples=900
 # -
 
-propagator = init_prop(Ψ₀, H, tlist; cheby_coeffs_limit)
+propagator = init_prop(Ψ₀, H, tlist; cheby_coeffs_limit, method=:cheby, specrange_method=:manual)
 Ψ_out = _propagate(propagator, tlist)
-propagator = init_prop(Ψ₀, H, tlist; cheby_coeffs_limit)
+propagator = init_prop(Ψ₀, H, tlist; cheby_coeffs_limit, method=:cheby, specrange_method=:manual)
 @time _propagate(propagator, tlist);
 
 benchmark_cheby_with_qdyn(
@@ -228,7 +173,7 @@ load_csv(f) = DataFrame(CSV.File(f))
 
 PRECISION =  [1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12]
 
-data_cheby = run_or_load(datadir("benchmark_gpu_cheby.csv"); load=load_csv, force=true) do
+data_gpu_cheby = run_or_load(datadir("benchmark_gpu_cheby.csv"); load=load_csv, force=false) do
     run_propagation_benchmark(;
         N=[10, 100, 1_000],
         precision=PRECISION,
@@ -237,11 +182,16 @@ data_cheby = run_or_load(datadir("benchmark_gpu_cheby.csv"); load=load_csv, forc
         exact_propagation_args=Dict(:cheby_coeffs_limit => 1e-15),
         convert_generator=ham_to_gpu,
         convert_state=psi_to_gpu,
-        tune_propagation_args=tune_cheby
+        tune_propagation_args=tune_cheby,
+        specrange_method=:manual
     )
 end
 
-for group in groupby(data_cheby, :N)
+data_dense = load_csv(datadir("benchmark_dense_cheby.csv"))
+
+data_static = filter(:N => _N->(_N == 10), load_csv(datadir("benchmark_mstatic_cheby.csv")))
+
+for group in groupby(data_dense, :N)
     N = group.N[1]
     fig = plot(
         group.precision, group.timing; marker=true, label="Julia",
@@ -250,9 +200,22 @@ for group in groupby(data_cheby, :N)
         ylabel="runtime (seconds)",
         xticks=PRECISION, title="Cheby (dense) – Hilbert space dimension N=$N",
     )
+    group_gpu = filter(:N => _N->(_N == N), data_gpu_cheby)
+    plot!(
+        fig, group_gpu.precision, group_gpu.timing; marker=true,
+        label="Julia (GPU)"
+    )
+    plot!(
+        fig, group.precision, group.QDYN_ifort; shape=:utriangle,
+        label="Fortran (ifort)"
+    )
+    if N == 10
+        plot!(
+            fig, data_static.precision, data_static.timing; shape=:rect,
+            label="Julia (static)"
+        )
+    end
     y_limits = ylims(fig)
     plot!(fig; ylims=(0, y_limits[2]))
     display(fig)
 end
-
-
