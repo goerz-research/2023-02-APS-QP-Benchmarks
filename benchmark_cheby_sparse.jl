@@ -61,6 +61,16 @@ benchmark_cheby_with_qdyn(
     cheby_coeffs_limit
 )
 
+qdyn.io.read_indexed_matrix(datadir("cheby_sparse_sanity", "H0.dat")) 
+
+qdyn.io.read_indexed_matrix(datadir("cheby_sparse_sanity", "H1.dat")) 
+
+benchmark_cheby_with_qdyn(
+    Ψ₀, H, tlist;
+    rf=datadir("cheby_sparse_sanity"),
+    cheby_coeffs_limit
+)
+
 Ψ_out_qdyn = pyconvert(Vector{ComplexF64},
     qdyn.io.read_psi_amplitudes(
         datadir("cheby_sparse_sanity", "final_state.dat.1"),

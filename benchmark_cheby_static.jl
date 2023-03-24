@@ -71,7 +71,7 @@ propagator = init_prop(Ψ₀, H, tlist; cheby_coeffs_limit)
 @time _propagate(propagator, tlist);
 
 benchmark_cheby_with_qdyn(
-    Ψ₀, H, tlist;
+    Array(Ψ₀), Array(H), tlist;
     rf=datadir("cheby_mstatic_sanity"),
     cheby_coeffs_limit
 )

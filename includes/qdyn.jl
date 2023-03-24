@@ -1,3 +1,6 @@
+using QuantumControl.Generators: Generator
+using SparseArrays
+
 using PythonCall
 qdyn = pyimport("qdyn")
 
@@ -7,7 +10,7 @@ function QDYNPulse(ampl, tlist)
 end
 
 
-function add_generator_to_qdyn_model(model, generator, tlist)
+function add_generator_to_qdyn_model(model, generator::Generator{Matrix{Float64}, Vector{Float64}}, tlist)
     n_drift = length(generator.ops) - length(generator.amplitudes)
     for (i, H) in enumerate(generator.ops)
         if i <= n_drift
@@ -16,6 +19,24 @@ function add_generator_to_qdyn_model(model, generator, tlist)
             ampl = generator.amplitudes[i-n_drift]
             pulse = QDYNPulse(ampl, tlist)
             model.add_ham(H, pulse = pulse, op_type = "dip", label = "")
+        end
+    end
+
+end
+
+
+function add_generator_to_qdyn_model(model, generator::Generator{SparseArrays.SparseMatrixCSC{Float64, Int64}, Vector{Float64}}, tlist)
+    n_drift = length(generator.ops) - length(generator.amplitudes)
+    for (i, H) in enumerate(generator.ops)
+        if i <= n_drift
+            model.add_ham(H, label = "", sparsity_model="indexed")
+        else
+            ampl = generator.amplitudes[i-n_drift]
+            pulse = QDYNPulse(ampl, tlist)
+            model.add_ham(
+                H, pulse = pulse, op_type = "dip", label = "",
+                sparsity_model="indexed"
+            )
         end
     end
 
